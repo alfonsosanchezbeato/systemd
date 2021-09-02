@@ -6,6 +6,7 @@
 #include <libfdt.h>
 
 #include "linux.h"
+#include "pe.h"
 #include "linux-aarch64.h"
 #include "missing_efi.h"
 
@@ -140,7 +141,7 @@ EFI_STATUS linux_exec(EFI_HANDLE image,
                       UINTN linux_addr,
                       UINTN initrd_addr, UINTN initrd_size) {
         struct arm64_kernel_header *hdr;
-        struct arm64_linux_pe_header *pe;
+        struct PeHeader *pe;
         handover_f handover;
 
         if (initrd_size != 0)
@@ -149,7 +150,7 @@ EFI_STATUS linux_exec(EFI_HANDLE image,
         hdr = (struct arm64_kernel_header *)linux_addr;
 
         pe = (void *)(linux_addr + hdr->hdr_offset);
-        handover = (handover_f)((UINTN)linux_addr + pe->opt.entry_point_addr);
+        handover = (handover_f)((UINTN)linux_addr + pe->OptionalHeader.AddressOfEntryPoint);
 
         handover(image, ST, image);
 
