@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: LGPL-2.1+ */
 
+#include <assert.h>
 #include <efi.h>
 #include <efilib.h>
 #include <libfdt.h>
@@ -9,10 +10,11 @@
 #include "missing_efi.h"
 
 /* Create new fdt, either empty or with the content of old_fdt if not null */
-static void *create_new_fdt(void *old_fdt, int fdt_sz) {
+static void *create_new_fdt(void *old_fdt, UINTN fdt_sz) {
         EFI_STATUS err;
-        void *fdt = (void *) 0xFFFFFFFFUL;
-        int ret;
+	/* Max physical address allowed for the allocation (no limit in this case) */
+        void *fdt = (void *) UINT64_MAX;
+        int r;
 
         err = uefi_call_wrapper(BS->AllocatePages, 4,
                                 AllocateMaxAddress,
@@ -21,51 +23,50 @@ static void *create_new_fdt(void *old_fdt, int fdt_sz) {
                                 (EFI_PHYSICAL_ADDRESS*)&fdt);
         if (EFI_ERROR(err)) {
                 Print(L"Cannot allocate when creating fdt\n");
-                return 0;
+                return NULL;
         }
 
         if (old_fdt) {
-                ret = fdt_open_into(old_fdt, fdt, fdt_sz);
-                if (ret != 0) {
-                        Print(L"Error %d when copying fdt\n", ret);
-                        return 0;
+                r = fdt_open_into(old_fdt, fdt, fdt_sz);
+                if (r != 0) {
+                        Print(L"Error %d when copying fdt\n", r);
+                        return NULL;
                 }
         } else {
-                ret = fdt_create_empty_tree(fdt, fdt_sz);
-                if (ret != 0) {
-                        Print(L"Error %d when creating empty fdt\n", ret);
-                        return 0;
+                r = fdt_create_empty_tree(fdt, fdt_sz);
+                if (r != 0) {
+                        Print(L"Error %d when creating empty fdt\n", r);
+                        return NULL;
                 }
         }
 
         /* Set in EFI configuration table */
         err = uefi_call_wrapper(BS->InstallConfigurationTable, 2,
-                                &EfiDtbTableGuid, fdt);
+                                &(EFI_GUID)EFI_DTB_TABLE_GUID, fdt);
         if (EFI_ERROR(err)) {
                 Print(L"Cannot set fdt in EFI configuration\n");
-                return 0;
+                return NULL;
         }
 
         return fdt;
 }
 
 static void *open_fdt(void) {
-        EFI_STATUS status;
+        EFI_STATUS err;
         void *fdt;
 
         /* Look for a device tree configuration table entry. */
-        status = LibGetSystemConfigurationTable(&EfiDtbTableGuid,
-                                                (VOID**)&fdt);
-        if (EFI_ERROR(status)) {
+        err = LibGetSystemConfigurationTable(&(EFI_GUID)EFI_DTB_TABLE_GUID, (VOID**)&fdt);
+        if (EFI_ERROR(err)) {
                 Print(L"DTB table not found, create new one\n");
                 fdt = create_new_fdt(NULL, 2048);
                 if (!fdt)
-                        return 0;
+                        return NULL;
         }
 
         if (fdt_check_header(fdt) != 0) {
                 Print(L"Invalid header detected on UEFI supplied FDT\n");
-                return 0;
+                return NULL;
         }
 
         return fdt;
@@ -73,34 +74,36 @@ static void *open_fdt(void) {
 
 static int update_chosen(void *fdt, UINTN initrd_addr, UINTN initrd_size) {
         uint64_t initrd_start, initrd_end;
-        int ret, node;
+        int r, node;
+
+        assert(fdt);
 
         node = fdt_subnode_offset(fdt, 0, "chosen");
         if (node < 0) {
                 node = fdt_add_subnode(fdt, 0, "chosen");
                 if (node < 0) {
                         /* 'node' is an error code when negative: */
-                        ret = node;
+                        r = node;
                         Print(L"Error creating chosen\n");
-                        return ret;
+                        return r;
                 }
         }
 
         initrd_start = cpu_to_fdt64(initrd_addr);
         initrd_end = cpu_to_fdt64(initrd_addr + initrd_size);
 
-        ret = fdt_setprop(fdt, node, "linux,initrd-start",
-                          &initrd_start, sizeof initrd_start);
-        if (ret) {
+        r = fdt_setprop(fdt, node, "linux,initrd-start",
+                        &initrd_start, sizeof(initrd_start));
+        if (r) {
                 Print(L"Cannot create initrd-start property\n");
-                return ret;
+                return r;
         }
 
-        ret = fdt_setprop(fdt, node, "linux,initrd-end",
-                          &initrd_end, sizeof initrd_end);
-        if (ret) {
+        r = fdt_setprop(fdt, node, "linux,initrd-end",
+                        &initrd_end, sizeof(initrd_end));
+        if (r) {
                 Print(L"Cannot create initrd-end property\n");
-                return ret;
+                return r;
         }
 
         return 0;
@@ -112,13 +115,15 @@ static int update_chosen(void *fdt, UINTN initrd_addr, UINTN initrd_size) {
 static void update_fdt(UINTN initrd_addr, UINTN initrd_size) {
         void *fdt;
 
+        assert(initrd_addr);
+        assert(initrd_size > 0);
+
         fdt = open_fdt();
-        if (fdt == 0)
+        if (fdt == NULL)
                 return;
 
         if (update_chosen(fdt, initrd_addr, initrd_size) == -FDT_ERR_NOSPACE) {
                 /* Copy to new tree and re-try */
-                Print(L"Not enough space, creating a new fdt\n");
                 fdt = create_new_fdt(fdt, fdt_totalsize(fdt) + FDT_EXTRA_SIZE);
                 if (!fdt)
                         return;
@@ -143,10 +148,8 @@ EFI_STATUS linux_exec(EFI_HANDLE image,
 
         hdr = (struct arm64_kernel_header *)linux_addr;
 
-        pe = (void *)((UINTN)linux_addr + hdr->hdr_offset);
+        pe = (void *)(linux_addr + hdr->hdr_offset);
         handover = (handover_f)((UINTN)linux_addr + pe->opt.entry_point_addr);
-
-        Print(L"Starting EFI kernel stub\n");
 
         handover(image, ST, image);
 
