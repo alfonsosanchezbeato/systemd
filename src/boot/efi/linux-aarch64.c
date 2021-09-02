@@ -6,14 +6,7 @@
 
 #include "linux.h"
 #include "linux-aarch64.h"
-
-/* DTB table GUID, as defined by UEFI specification 2.9 */
-/* gnu-efi after 3.0.13 should already define this */
-#ifndef EFI_DTB_TABLE_GUID
-#define EFI_DTB_TABLE_GUID \
-    { 0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0} }
-static EFI_GUID EfiDtbTableGuid = EFI_DTB_TABLE_GUID;
-#endif
+#include "missing_efi.h"
 
 /* Create new fdt, either empty or with the content of old_fdt if not null */
 static void *create_new_fdt(void *old_fdt, int fdt_sz) {
