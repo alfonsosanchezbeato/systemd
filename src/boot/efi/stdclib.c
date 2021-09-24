@@ -1,4 +1,4 @@
-/* Public domain */
+/* SPDX-License-Identifier: Unlicense */
 /* Taken from https://clc-wiki.net/wiki */
 #include <stdint.h>
 

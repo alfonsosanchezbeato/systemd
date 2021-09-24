@@ -1,4 +1,4 @@
-/* Public domain  */
+/* SPDX-License-Identifier: Unlicense */
 #pragma once
 
 #include <stddef.h>
