@@ -24,57 +24,6 @@
         #error Unknown EFI arch
 #endif
 
-struct DosFileHeader {
-        UINT8   Magic[2];
-        UINT16  LastSize;
-        UINT16  nBlocks;
-        UINT16  nReloc;
-        UINT16  HdrSize;
-        UINT16  MinAlloc;
-        UINT16  MaxAlloc;
-        UINT16  ss;
-        UINT16  sp;
-        UINT16  Checksum;
-        UINT16  ip;
-        UINT16  cs;
-        UINT16  RelocPos;
-        UINT16  nOverlay;
-        UINT16  reserved[4];
-        UINT16  OEMId;
-        UINT16  OEMInfo;
-        UINT16  reserved2[10];
-        UINT32  ExeHeader;
-} _packed_;
-
-struct CoffFileHeader {
-        UINT16  Machine;
-        UINT16  NumberOfSections;
-        UINT32  TimeDateStamp;
-        UINT32  PointerToSymbolTable;
-        UINT32  NumberOfSymbols;
-        UINT16  SizeOfOptionalHeader;
-        UINT16  Characteristics;
-} _packed_;
-
-struct PeFileHeader {
-        UINT8   Magic[4];
-        struct CoffFileHeader FileHeader;
-        /* OptionalHeader omitted */
-} _packed_;
-
-struct PeSectionHeader {
-        UINT8   Name[8];
-        UINT32  VirtualSize;
-        UINT32  VirtualAddress;
-        UINT32  SizeOfRawData;
-        UINT32  PointerToRawData;
-        UINT32  PointerToRelocations;
-        UINT32  PointerToLinenumbers;
-        UINT16  NumberOfRelocations;
-        UINT16  NumberOfLinenumbers;
-        UINT32  Characteristics;
-} _packed_;
-
 static inline BOOLEAN verify_dos(const struct DosFileHeader *dos) {
         assert(dos);
         return CompareMem(dos->Magic, DOS_FILE_MAGIC, STRLEN(DOS_FILE_MAGIC)) == 0;
