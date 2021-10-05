@@ -11,7 +11,7 @@
 #include "missing_efi.h"
 
 /* Create new fdt, either empty or with the content of old_fdt if not null */
-static void *create_new_fdt(void *old_fdt, UINTN fdt_sz) {
+static void *create_new_fdt(const void *old_fdt, UINTN fdt_sz) {
         EFI_STATUS err;
 	/* Max physical address allowed for the allocation (no limit in this case) */
         void *fdt = (void *) UINT64_MAX;
@@ -59,7 +59,7 @@ static void *open_fdt(void) {
         /* Look for a device tree configuration table entry. */
         err = LibGetSystemConfigurationTable(&(EFI_GUID)EFI_DTB_TABLE_GUID, (VOID**)&fdt);
         if (EFI_ERROR(err)) {
-                Print(L"DTB table not found, creating new one\n");
+                /* DTB table not found, creating new one */
                 fdt = create_new_fdt(NULL, 2048);
                 if (!fdt)
                         return NULL;
