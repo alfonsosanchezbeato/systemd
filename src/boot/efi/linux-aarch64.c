@@ -23,20 +23,20 @@ static void *create_new_fdt(void *old_fdt, UINTN fdt_sz) {
                                 EFI_SIZE_TO_PAGES(fdt_sz),
                                 (EFI_PHYSICAL_ADDRESS*)&fdt);
         if (EFI_ERROR(err)) {
-                Print(L"Cannot allocate when creating fdt\n");
+                log_error_stall(L"Cannot allocate when creating fdt: %r", err);
                 return NULL;
         }
 
         if (old_fdt) {
                 r = fdt_open_into(old_fdt, fdt, fdt_sz);
                 if (r != 0) {
-                        Print(L"Error %d when copying fdt\n", r);
+                        log_error_stall(L"Error %d when copying fdt", r);
                         return NULL;
                 }
         } else {
                 r = fdt_create_empty_tree(fdt, fdt_sz);
                 if (r != 0) {
-                        Print(L"Error %d when creating empty fdt\n", r);
+                        log_error_stall(L"Error %d when creating empty fdt", r);
                         return NULL;
                 }
         }
@@ -45,7 +45,7 @@ static void *create_new_fdt(void *old_fdt, UINTN fdt_sz) {
         err = uefi_call_wrapper(BS->InstallConfigurationTable, 2,
                                 &(EFI_GUID)EFI_DTB_TABLE_GUID, fdt);
         if (EFI_ERROR(err)) {
-                Print(L"Cannot set fdt in EFI configuration\n");
+                log_error_stall(L"Cannot set fdt in EFI configuration: %r", err);
                 return NULL;
         }
 
@@ -59,14 +59,14 @@ static void *open_fdt(void) {
         /* Look for a device tree configuration table entry. */
         err = LibGetSystemConfigurationTable(&(EFI_GUID)EFI_DTB_TABLE_GUID, (VOID**)&fdt);
         if (EFI_ERROR(err)) {
-                Print(L"DTB table not found, create new one\n");
+                Print(L"DTB table not found, creating new one\n");
                 fdt = create_new_fdt(NULL, 2048);
                 if (!fdt)
                         return NULL;
         }
 
         if (fdt_check_header(fdt) != 0) {
-                Print(L"Invalid header detected on UEFI supplied FDT\n");
+                log_error_stall(L"Invalid header detected on UEFI supplied FDT");
                 return NULL;
         }
 
@@ -85,7 +85,7 @@ static int update_chosen(void *fdt, UINTN initrd_addr, UINTN initrd_size) {
                 if (node < 0) {
                         /* 'node' is an error code when negative: */
                         r = node;
-                        Print(L"Error creating chosen\n");
+                        log_error_stall(L"Error %d creating chosen node", r);
                         return r;
                 }
         }
@@ -96,14 +96,14 @@ static int update_chosen(void *fdt, UINTN initrd_addr, UINTN initrd_size) {
         r = fdt_setprop(fdt, node, "linux,initrd-start",
                         &initrd_start, sizeof(initrd_start));
         if (r) {
-                Print(L"Cannot create initrd-start property\n");
+                log_error_stall(L"Cannot create initrd-start property: %d", r);
                 return r;
         }
 
         r = fdt_setprop(fdt, node, "linux,initrd-end",
                         &initrd_end, sizeof(initrd_end));
         if (r) {
-                Print(L"Cannot create initrd-end property\n");
+                log_error_stall(L"Cannot create initrd-end property: %d", r);
                 return r;
         }
 
