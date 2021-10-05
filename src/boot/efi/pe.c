@@ -40,7 +40,8 @@ static inline BOOLEAN verify_pe(const struct PeFileHeader *pe) {
 static inline UINTN section_table_offset(const struct DosFileHeader *dos, const struct PeFileHeader *pe) {
         assert(dos);
         assert(pe);
-        return dos->ExeHeader + sizeof(struct PeFileHeader) + pe->FileHeader.SizeOfOptionalHeader;
+        return dos->ExeHeader + OFFSETOF(struct PeFileHeader, OptionalHeader) +
+                pe->FileHeader.SizeOfOptionalHeader;
 }
 
 static VOID locate_sections(
